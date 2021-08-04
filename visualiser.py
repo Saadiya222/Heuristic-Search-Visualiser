@@ -3,6 +3,8 @@ import math
 import random
 from queue import PriorityQueue
 
+# credits - Tech With Tim
+
 # display settings for the pygame window
 
 WIDTH = 800
