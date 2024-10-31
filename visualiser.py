@@ -189,12 +189,21 @@ def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obsta
     path.append((start.row, start.col))
     path_cells.add(start)
     
-    print("\n=== Path Details ===")
+
     print(f"Path found with {len(removed_list)} obstacle(s) removed")
     print(f"Removed obstacles at positions: {removed_list}")
-    print(f"Complete path: {path[::-1]}")
+    print(f"Shortest path: {path[::-1]}")
     
     return path_cells
+
+def get_path_coordinates(ancestor, end, start):
+    path = []
+    current = end
+    while current in ancestor:
+        path.append((current.row, current.col))
+        current = ancestor[current]
+    path.append((start.row, start.col))
+    return path[::-1]  # Reverse to get start->end order
 
 def bfsWithoutRemoval(draw, grid, start, end):
     start_time = time.time()
@@ -209,9 +218,10 @@ def bfsWithoutRemoval(draw, grid, start, end):
         
         if current == end:
             end_time = time.time()
+            path = get_path_coordinates(ancestor, end, start)
             print("\n=== Search Results (BFS) ===")
-            print(f" *** Path found! *** \nCost: ({len(visited) -1})") # initial node doesnt count
-            print(f"Shortest path: XOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXO")   
+            print(f" *** Path found! *** \nCost: ({len(path) -1})")
+            print(f"Shortest path: {path}")   
             print(f"Number of nodes visited: {len(visited)}")
             print(f"Visited nodes: {sorted([(node.row, node.col) for node in visited])}")
             
@@ -234,7 +244,6 @@ def bfsWithoutRemoval(draw, grid, start, end):
     end_time = time.time()
     print("\n=== Search Results (BFS) ===")
     print("No path found!")
-    print(f"Number of nodes visited: {len(visited)}")
     calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS")
     return False
 
@@ -260,9 +269,11 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
         if current_cell == end:
             end_time = time.time()
             print("\n=== Search Results (BFS with removal) ===")
-            print(f" *** Path found! *** \nCost: ({len(visited) -1})") # initial node doesnt count
-            print(f"Shortest path: XOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXO")          
+            print(f" *** Path found! *** ")
             path_cells = reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles)
+            cost = len(path_cells) - 1 # initial state is not considered 
+            print("Cost :\nS")
+            print(cost)
             
             # Maintain explored cells visualization
             for cell in explored_cells:
@@ -291,7 +302,6 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
     end_time = time.time()
     print("\n=== Search Results (BFS with removal) ===")
     print("No path found!")
-    print(f"Number of nodes visited: {len(visited)}")
     calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS with removal")
     return False 
 
@@ -378,8 +388,6 @@ def aStarWithoutRemoval(draw, grid, start, end):  # the search algorithm
             cur.make_closed()
     
     print("No solution found!")
-    print(f"Number of nodes visited: {len(visited_nodes)}")
-    print(f"Visited nodes: {sorted(visited_nodes)}")
     end_time = time.time()
     calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size) # we get performance metrics for both successful and unsuccessful searches
     return False
@@ -487,7 +495,7 @@ def show_path_with_removals(ancestor, current_state, start, draw, removed_obstac
     print("\n=== Path Details ===")
     print(f"Path found with {len(removed_list)} obstacle(s) removed")
     print(f"Removed obstacles at positions: {removed_list}")
-    print(f"Complete path: {path[::-1]}")
+    print(f"Shortest path: {path[::-1]}")
 
 def create_grid(rows, cols, cell_size, obstacle_coords):
     grid = []
