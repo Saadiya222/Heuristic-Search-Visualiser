@@ -26,8 +26,8 @@ class Cell:
     def __init__(self, row, col, width, total_rows): # Initializes each cell with attributes like its position, color, and list of neighboring cells
         self.row = row
         self.col = col
-        self.x = row * width
-        self.y = col * width
+        self.x = col * width  # Changed from row to col for x coordinate
+        self.y = row * width
         self.color = CREAM
         self.neighbours = []
         self.width = width
@@ -81,6 +81,7 @@ class Cell:
 
     def draw(self, win):
         pygame.draw.rect(win, self.color, (self.x, self.y, self.width, self.width))
+
 
     def update_neighbours(self, grid): # Updates the neighbours list for each cell by checking for open cells around it
         self.neighbours = []
@@ -144,95 +145,104 @@ def search(draw, grid, start, end):  # the search algorithm
         draw()
         if cur != start: # If cur is not the start cell, its color is changed to indicate that it has been fully explored
             cur.make_closed()
+        
     return False
 
 
-def create_grid(rows, width):
+def create_grid(rows, cols, width, obstacle_coords):
     grid = []
-    gap = width // rows
+    gap = width // max(rows, cols)
+    
     for i in range(rows):
         grid.append([])
-        for j in range(rows):
-            cell = Cell(i, j, gap, rows)
-            r = random.random()
-            if r >= 0.7:  # each cell has a 30% chance of becoming an obstacle!
+        for j in range(cols):
+            cell = Cell(i, j, gap, max(rows, cols))
+            if (i, j) in obstacle_coords:
                 cell.make_barrier()
             grid[i].append(cell)
+    
     return grid
 
 
-def draw_grid(win, rows, width):
-    gap = width // rows
-    for i in range(rows):
+
+def draw_grid(win, rows,cols,  width):
+    gap = width // max(rows, cols)
+    
+    # Draw horizontal lines
+    for i in range(rows + 1):
         pygame.draw.line(win, GREY, (0, i * gap), (width, i * gap))
-        for j in range(rows):
-            pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
+    
+    # Draw vertical lines
+    for j in range(cols + 1):
+        pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
 
 
-def draw(win, grid, rows, width):
+
+def draw(win, grid, rows, cols, width):
     win.fill(CREAM)
     for row in grid:
         for cell in row:
             cell.draw(win)
-    draw_grid(win, rows, width)
+    draw_grid(win, rows, cols, width)
     pygame.display.update()
 
-
+'''''
 def get_clicked_pos(pos, rows, width):
     gap = width // rows
     y, x = pos
     row = y // gap
     col = x // gap
     return row, col
+    '''
 
 
 def main(win, width):
-    rows = 20
-    #cols 30
-    grid = create_grid(rows, width)
-    start = None
-    end = None
+    # Get grid dimensions from user
+    rows = int(input("Enter number of rows: "))
+    cols = int(input("Enter number of columns: "))
+    
+    # Get obstacle coordinates
+    obstacle_coords = []
+    num_obstacles = int(input("Enter number of obstacles: "))
+    
+    print("Enter obstacle coordinates (row col) one per line:")
+    for _ in range(num_obstacles):
+        row, col = map(int, input().split())
+        obstacle_coords.append((row, col))
+    
+    grid = create_grid(rows, cols, width, obstacle_coords)
+    
+    # Set fixed start and end positions
+    start = grid[0][0]  # Top-left corner
+    end = grid[rows-1][cols-1]  # Bottom-right corner
+    
+    start.make_start()
+    end.make_end()
+    
     run = True
-    started = False
+    
     while run:
-        draw(win, grid, rows, width)
+        draw(win, grid, rows, cols, width)
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if pygame.mouse.get_pressed()[0]:  # LEFT
-                pos = pygame.mouse.get_pos()
-                row, col = get_clicked_pos(pos, rows, width)
-                cell = grid[row][col]
-                if not start and cell != end:
-                    start = cell
-                    cell.make_start()
-                elif not end and cell != start:
-                    end = cell
-                    cell.make_end()
-                elif cell != end and cell != start:
-                    cell.make_barrier()
-            elif pygame.mouse.get_pressed()[2]:  # RIGHT
-                pos = pygame.mouse.get_pos()
-                row, col = get_clicked_pos(pos, rows, width)
-                cell = grid[row][col]
-                cell.reset()
-                if cell == start:
-                    start = None
-                elif cell == end:
-                    end = None
+                
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and start and end:
+                if event.key == pygame.K_SPACE:
                     for row in grid:
                         for cell in row:
-                            if cell.is_closed() or cell.is_path():
-                                cell.make_open()
                             cell.update_neighbours(grid)
-                    search(lambda: draw(win, grid, rows, width), grid, start, end)
+                    
+                    search(lambda: draw(win, grid, rows, cols, width), grid, start, end)
+                
                 if event.key == pygame.K_c:
-                    start = None
-                    end = None
-                    grid = create_grid(rows, width)
-                    #grid = create_grid(rows,cols, width)
+                    grid = create_grid(rows, cols, width, obstacle_coords)
+                    start = grid[0][0]
+                    end = grid[rows-1][cols-1]
+                    start.make_start()
+                    end.make_end()
+    
     pygame.quit()
 
 
