@@ -7,40 +7,42 @@ from queue import PriorityQueue
 
 # display settings for the pygame window
 
-WIDTH = 800
-WIN = pygame.display.set_mode((WIDTH, WIDTH))
+WIDTH = 800 # sets the window width to 800 pixels
+WIN = pygame.display.set_mode((WIDTH, WIDTH)) # creates a Pygame window where the grid and pathfinding visualization will be displayed
 
 # mentioning the color for cells of each state
 
-OBSTACLE_COLOR = (204, 0, 102)
-EXPLORED_COLOR = (51, 0, 102)
-YELLOW = (255, 255, 0)
-BLACK = (0, 0, 0)
+OBSTACLE_COLOR = (0, 0, 0)
+EXPLORED_COLOR = (211, 211, 211)
+YELLOW = (255, 255, 0) ###
+CREAM = (250, 249, 246)
 PATH_COLOR = (0, 128, 255)
-START_COLOR = (155, 255, 255)
-GREY = (64, 64, 64)
-END_COLOR = (153, 255, 204)
+START_COLOR = (255, 215, 0) # knight color gold 
+GREY = (64, 64, 64) ###
+END_COLOR = (255,192,203) # princess color pink 
 
 
 class Cell:
-    def __init__(self, row, col, width, total_rows):
+    def __init__(self, row, col, width, total_rows): # Initializes each cell with attributes like its position, color, and list of neighboring cells
         self.row = row
         self.col = col
         self.x = row * width
         self.y = col * width
-        self.color = BLACK
+        self.color = CREAM
         self.neighbours = []
         self.width = width
         self.total_rows = total_rows
 
-    def get_pos(self):
+    def get_pos(self): # Returns the cell’s row and column position
         return self.row, self.col
 
-    def is_closed(self):
+# the following methods check the cell’s current state
+
+    def is_closed(self): 
         return self.color == EXPLORED_COLOR
 
     def is_open(self):
-        return self.color == BLACK
+        return self.color == CREAM
 
     def is_barrier(self):
         return self.color == OBSTACLE_COLOR
@@ -55,30 +57,32 @@ class Cell:
         return self.color == PATH_COLOR
 
     def reset(self):
-        self.color = BLACK
+        self.color = CREAM
 
-    def make_start(self):
+# Update the cell’s color to indicate its new state (making the search dynamic)
+
+    def make_start(self): # choose knight initial location
         self.color = START_COLOR
 
-    def make_closed(self):
+    def make_closed(self): # grey
         self.color = EXPLORED_COLOR
 
-    def make_open(self):
-        self.color = BLACK
+    def make_open(self): 
+        self.color = CREAM
 
     def make_barrier(self):
         self.color = OBSTACLE_COLOR
 
-    def make_end(self):
+    def make_end(self): # choose princess location
         self.color = END_COLOR
 
-    def make_path(self):
+    def make_path(self): 
         self.color = PATH_COLOR
 
     def draw(self, win):
         pygame.draw.rect(win, self.color, (self.x, self.y, self.width, self.width))
 
-    def update_neighbours(self, grid):
+    def update_neighbours(self, grid): # Updates the neighbours list for each cell by checking for open cells around it
         self.neighbours = []
         if self.row < self.total_rows - 1 and not grid[self.row + 1][self.col].is_barrier():  # DOWN
             self.neighbours.append(grid[self.row + 1][self.col])
@@ -93,13 +97,13 @@ class Cell:
         return False
 
 
-def heuristic_fn(p1, p2):  # the heuristic function used in this scenario is manhattan distance
+def heuristic_fn(p1, p2):  # the heuristic function used in our scenario is manhattan distance (sum of the absolute differences between the x and y coordinates of two points)
     x1, y1 = p1
     x2, y2 = p2
     return abs(x1 - x2) + abs(y1 - y2)
 
 
-def show_path(came_from, cur, start, draw):  # displays the shortest path if found
+def show_path(came_from, cur, start, draw):  # backtracks through the cells to display the found path after the end cell is reached and displays the shortest path if found
     while cur in came_from:
         cur = came_from[cur]
         if cur != start:
@@ -108,27 +112,27 @@ def show_path(came_from, cur, start, draw):  # displays the shortest path if fou
 
 
 def search(draw, grid, start, end):  # the search algorithm
-    count = 0
-    open_set = PriorityQueue()
-    ancestor = {}
-    g_score = {cell: float("inf") for row in grid for cell in row}
+    count = 0 # so that ties are broken by insertion order in the Pq
+    open_set = PriorityQueue() # Frontier | lower-priority (better f scorre) cells being dequeued first
+    ancestor = {} # to reconstruct the path once the end cell is reached
+    g_score = {cell: float("inf") for row in grid for cell in row} # Initially, all cells are set to infinity except for the g(start)=0, bc wel'll check in line 135
     g_score[start] = 0
-    f_score = {cell: float("inf") for row in grid for cell in row}
-    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos())
-    open_set_hash = {start}
-    open_set.put((f_score[start], count, start))  # putting the source cell into the queue
+    f_score = {cell: float("inf") for row in grid for cell in row} # Initially, all cells are set to infinity
+    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos()) + g_score[start]
+    open_set_hash = {start} # A set that mirrors open_set, stores the cells currently in the queue to allow for efficient membership checks
+    open_set.put((f_score[start], count, start))  # putting the source (start) cell into the Pqueue
     while not open_set.empty():
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type == pygame.QUIT: # if user quits window
                 pygame.quit()
-        cur = open_set.get()[2]
-        open_set_hash.remove(cur)
+        cur = open_set.get()[2] # Retrieves the cell with the lowest f_score from open_set
+        open_set_hash.remove(cur) # because we are now exploring it
         if cur == end:  # if the destination is reached, display the path
             show_path(ancestor, end, start, draw)
             end.make_end()
-            return True
-        for neighbour in cur.neighbours:  # check the neighbours of the current cell
-            if g_score[cur] + 1 < g_score[neighbour]:
+            return True # path was found
+        for neighbour in cur.neighbours:  # check the neighbours of the current cell 
+            if g_score[cur] + 1 < g_score[neighbour]: # is the path to neighbour through cur shorter than the previously recorded path 
                 ancestor[neighbour] = cur
                 g_score[neighbour] = g_score[cur] + 1
                 f_score[neighbour] = g_score[neighbour] + heuristic_fn(neighbour.get_pos(), end.get_pos())
@@ -136,9 +140,9 @@ def search(draw, grid, start, end):  # the search algorithm
                     count += 1
                     open_set.put((f_score[neighbour], count, neighbour))
                     open_set_hash.add(neighbour)
-                    neighbour.make_open()
+                    neighbour.make_open() # Changes the color of neighbour to indicate it has been added to the open set (light grey)
         draw()
-        if cur != start:
+        if cur != start: # If cur is not the start cell, its color is changed to indicate that it has been fully explored
             cur.make_closed()
     return False
 
@@ -166,7 +170,7 @@ def draw_grid(win, rows, width):
 
 
 def draw(win, grid, rows, width):
-    win.fill(BLACK)
+    win.fill(CREAM)
     for row in grid:
         for cell in row:
             cell.draw(win)
@@ -183,7 +187,8 @@ def get_clicked_pos(pos, rows, width):
 
 
 def main(win, width):
-    rows = 50
+    rows = 20
+    #cols 30
     grid = create_grid(rows, width)
     start = None
     end = None
@@ -227,6 +232,7 @@ def main(win, width):
                     start = None
                     end = None
                     grid = create_grid(rows, width)
+                    #grid = create_grid(rows,cols, width)
     pygame.quit()
 
 
