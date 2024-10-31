@@ -121,6 +121,16 @@ def show_path(came_from, cur, start, draw):  # backtracks through the cells to d
         if cur != start:
             cur.make_path()
         draw()
+def bfsWithoutRemoval(draw, grid, start, end):
+    start_time = time.time()
+    # Function body will be implemented next
+    pass
+
+def bfsWithRemoval(draw, grid, start, end, max_removals):
+    start_time = time.time()
+    # Function body will be implemented next
+    pass
+
 
 def aStarWithoutRemoval(draw, grid, start, end):  # the search algorithm
 
@@ -417,6 +427,7 @@ def main():
                     run = False
                     
                 if event.type == pygame.KEYDOWN:
+                    # A* controls
                     if event.key == pygame.K_SPACE:
                         for row in grid:
                             for cell in row:
@@ -431,6 +442,22 @@ def main():
                         print("\n=== Running A* Search With Obstacle Removal ===")
                         aStarWithRemoval(lambda: draw(win, grid, rows, cols, CELL_SIZE), grid, start, end, obstacles_to_remove)
                     
+                    # BFS controls
+                    if event.key == pygame.K_b:
+                        for row in grid:
+                            for cell in row:
+                                cell.update_neighbours(grid)
+                        print("\n=== Running BFS Without Obstacle Removal ===")
+                        bfsWithoutRemoval(lambda: draw(win, grid, rows, cols, CELL_SIZE), grid, start, end)
+                    
+                    if event.key == pygame.K_v:
+                        for row in grid:
+                            for cell in row:
+                                cell.update_neighbours(grid)
+                        print("\n=== Running BFS With Obstacle Removal ===")
+                        bfsWithRemoval(lambda: draw(win, grid, rows, cols, CELL_SIZE), grid, start, end, obstacles_to_remove)
+                    
+                    # Reset grid
                     if event.key == pygame.K_c:
                         grid = create_grid(rows, cols, CELL_SIZE, obstacle_coords)
                         start = grid[0][0]
