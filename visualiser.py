@@ -210,7 +210,8 @@ def bfsWithoutRemoval(draw, grid, start, end):
         if current == end:
             end_time = time.time()
             print("\n=== Search Results (BFS) ===")
-            print(f"Path found! Cost: {len(visited)}")
+            print(f" *** Path found! *** \nCost: ({len(visited) -1})") # initial node doesnt count
+            print(f"Shortest path: XOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXO")   
             print(f"Number of nodes visited: {len(visited)}")
             print(f"Visited nodes: {sorted([(node.row, node.col) for node in visited])}")
             
@@ -259,9 +260,8 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
         if current_cell == end:
             end_time = time.time()
             print("\n=== Search Results (BFS with removal) ===")
-            print(f"Path found! Cost: {len(visited)}")
-            print(f"Number of nodes visited: {len(visited)}")
-            
+            print(f" *** Path found! *** \nCost: ({len(visited) -1})") # initial node doesnt count
+            print(f"Shortest path: XOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXOXO")          
             path_cells = reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles)
             
             # Maintain explored cells visualization
@@ -353,7 +353,7 @@ def aStarWithoutRemoval(draw, grid, start, end):  # the search algorithm
             path.reverse()
             
             print("\n=== Search Results ===")
-            print(f"Path found! Cost: {g_score[end]}")
+            print(f" *** Path found! ***  \nCost: {g_score[end]}")
             print(f"Shortest path: {path}")
             print(f"Number of nodes visited: {len(visited_nodes)}")
             print(f"Visited nodes: {sorted(visited_nodes)}")
@@ -640,7 +640,7 @@ def main():
     except Exception as e:
         print(f"Error: Unexpected error occurred - {str(e)}")
 
-pygame.display.set_caption("Heuristic Search (A*)")
+pygame.display.set_caption("Saving the Princess")
 main()
 
 
