@@ -1,6 +1,4 @@
-7 7
+3 3 
 2 0 
-3 3
-0 4
-obstacles to remove = 3
+obstacles to remove = 1
 a*
