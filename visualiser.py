@@ -2,12 +2,12 @@ import pygame
 import time 
 import psutil
 import os
-from queue import PriorityQueue
+from queue import PriorityQueue # For A*
+from collections import deque # For BFS
 
-# credits - Tech With Tim
+
 
 # display settings for the pygame window
-
 def create_window(rows, cols):
     CELL_SIZE = 40  # Fixed size for each cell
     width = cols * CELL_SIZE
@@ -109,27 +109,193 @@ class Cell:
         if self.col > 0 and not grid[self.row][self.col - 1].is_barrier():
             self.neighbours.append(grid[self.row][self.col - 1])
 
-def heuristic_fn(p1, p2):  # the heuristic function used in our scenario is manhattan distance (sum of the absolute differences between the x and y coordinates of two points)
+def heuristic_fn(p1, p2):  # for a* : the heuristic function used in our scenario is manhattan distance (sum of the absolute differences between the x and y coordinates of two points)
     x1, y1 = p1
     x2, y2 = p2
     return abs(x1 - x2) + abs(y1 - y2)
 
 
-def show_path(came_from, cur, start, draw):  # backtracks through the cells to display the found path after the end cell is reached and displays the shortest path if found
+def show_path(came_from, cur, start, draw):  # for a* and bfs without removal Bbacktracks through the cells to display the found path after the end cell is reached and displays the shortest path if found
     while cur in came_from:
         cur = came_from[cur]
         if cur != start:
             cur.make_path()
         draw()
+'''''
+def show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles): # for a* and bfs without removal
+    path = []
+    path_cells = set()  # Initialize empty set for path cells
+    removed_list = []
+    actual_removed = set()
+    
+    current = current_state
+    while current in ancestor:
+        cell, removals = current
+        path_cells.add(cell)  # Add each cell to the set
+        
+        if current in removed_obstacles:
+            removed_list.append(removed_obstacles[current])
+            actual_removed.add(cell)
+        
+        path.append((cell.row, cell.col))
+        
+        if cell != start:
+            if cell in actual_removed:
+                cell.make_barrier()
+            else:
+                cell.make_path()
+        
+        current = ancestor[current]
+        draw()
+    
+    path.append((start.row, start.col))
+    path_cells.add(start)  # Don't forget to add start cell
+    
+    print("\n=== Path Details ===")
+    print(f"Path found with {len(removed_list)} obstacle(s) removed")
+    print(f"Removed obstacles at positions: {removed_list}")
+    print(f"Complete path: {path[::-1]}")
+    
+    return path_cells  # Now we always return a set, even if empty
+'''
+
+def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles):
+    path = []
+    path_cells = set()
+    removed_list = []
+    actual_removed = set()
+    
+    current = current_state
+    while current in ancestor:
+        cell, removals = current
+        path_cells.add(cell)
+        
+        if current in removed_obstacles:
+            removed_list.append(removed_obstacles[current])
+            actual_removed.add(cell)
+        
+        path.append((cell.row, cell.col))
+        
+        if cell != start:
+            if cell in actual_removed:
+                cell.make_barrier()
+            else:
+                cell.make_path()
+        
+        current = ancestor[current]
+        draw()
+    
+    # Add start position
+    path.append((start.row, start.col))
+    path_cells.add(start)
+    
+    print("\n=== Path Details ===")
+    print(f"Path found with {len(removed_list)} obstacle(s) removed")
+    print(f"Removed obstacles at positions: {removed_list}")
+    print(f"Complete path: {path[::-1]}")
+    
+    return path_cells
+
 def bfsWithoutRemoval(draw, grid, start, end):
     start_time = time.time()
-    # Function body will be implemented next
-    pass
+    queue = deque([start])
+    visited = {start}
+    ancestor = {}
+    max_queue_size = 1
+    
+    while queue:
+        max_queue_size = max(max_queue_size, len(queue))
+        current = queue.popleft()
+        
+        if current == end:
+            end_time = time.time()
+            print("\n=== Search Results (BFS) ===")
+            print(f"Path found! Cost: {len(visited)}")
+            print(f"Number of nodes visited: {len(visited)}")
+            print(f"Visited nodes: {sorted([(node.row, node.col) for node in visited])}")
+            
+            calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS")
+            show_path(ancestor, end, start, draw)
+            end.make_end()
+            return True
+            
+        for neighbor in current.neighbours:
+            if neighbor not in visited:
+                queue.append(neighbor)
+                visited.add(neighbor)
+                ancestor[neighbor] = current
+                neighbor.make_open()
+        
+        draw()
+        if current != start:
+            current.make_closed()
+    
+    end_time = time.time()
+    print("\n=== Search Results (BFS) ===")
+    print("No path found!")
+    print(f"Number of nodes visited: {len(visited)}")
+    calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS")
+    return False
 
 def bfsWithRemoval(draw, grid, start, end, max_removals):
     start_time = time.time()
-    # Function body will be implemented next
-    pass
+    initial_state = (start, 0)
+    queue = deque([initial_state])
+    visited = {initial_state}
+    ancestor = {}
+    removed_obstacles = {}
+    max_queue_size = 1
+    explored_cells = set()
+    
+    while queue:
+        max_queue_size = max(max_queue_size, len(queue))
+        current_state = queue.popleft()
+        current_cell, removals_used = current_state
+        
+        explored_cells.add(current_cell)
+        if current_cell != start and current_cell != end:
+            current_cell.make_closed()
+        
+        if current_cell == end:
+            end_time = time.time()
+            print("\n=== Search Results (BFS with removal) ===")
+            print(f"Path found! Cost: {len(visited)}")
+            print(f"Number of nodes visited: {len(visited)}")
+            
+            path_cells = reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles)
+            
+            # Maintain explored cells visualization
+            for cell in explored_cells:
+                if cell not in path_cells and cell != start and cell != end:
+                    cell.make_closed()
+            
+            end.make_end()
+            calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS with removal")
+            return True
+            
+        for neighbor in get_neighbors_with_removals(current_cell, grid, removals_used, max_removals):
+            neighbor_cell, new_removals, removed = neighbor
+            neighbor_state = (neighbor_cell, new_removals)
+            
+            if neighbor_state not in visited:
+                queue.append(neighbor_state)
+                visited.add(neighbor_state)
+                ancestor[neighbor_state] = current_state
+                if removed:
+                    removed_obstacles[neighbor_state] = (neighbor_cell.row, neighbor_cell.col)
+                if neighbor_cell not in explored_cells and neighbor_cell != end:
+                    neighbor_cell.make_open()
+        
+        draw()
+    
+    end_time = time.time()
+    print("\n=== Search Results (BFS with removal) ===")
+    print("No path found!")
+    print(f"Number of nodes visited: {len(visited)}")
+    calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS with removal")
+    return False 
+
+
 
 
 def aStarWithoutRemoval(draw, grid, start, end):  # the search algorithm
@@ -378,12 +544,12 @@ def read_input_file(filename):
         
         return rows, cols, obstacle_coords, obstacles_to_remove, search_type
     
-def calculate_performance_metrics(start_time, end_time, visited_nodes, open_set_size, with_removal=False):
+def calculate_performance_metrics(start_time, end_time, visited_nodes, open_set_size, search_type="A*"):
+    # he parameter 'search_type="A*"' is a default value that ensures backward compatibility with existing code. When no search type is specified in the function call, it assumes we're running A*. This default value makes the function flexible - it can handle both old calls (which don't specify a search type) and new calls (which do specify BFS or other search types). It's a good programming practice that allows us to extend functionality while maintaining existing code.
     time_taken = end_time - start_time
     process = psutil.Process(os.getpid())
     memory_used = process.memory_info().rss / 1024 / 1024
     
-    search_type = "with obstacle removal" if with_removal else "without obstacle removal"
     print(f"\n=== Performance Metrics ({search_type}) ===")
     print(f"Time taken: {time_taken:.4f} seconds")
     print(f"Memory used: {memory_used:.2f} MB")
