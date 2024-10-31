@@ -193,7 +193,7 @@ def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obsta
     print(f"Path found with {len(removed_list)} obstacle(s) removed")
     print(f"Removed obstacles at positions: {removed_list}")
     print(f"Shortest path: {path[::-1]}")
-    
+    print()
     return path_cells
 
 def get_path_coordinates(ancestor, end, start):
@@ -270,10 +270,17 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
             end_time = time.time()
             print("\n=== Search Results (BFS with removal) ===")
             print(f" *** Path found! *** ")
+            
+            # Get unique visited cells (without duplicates from different removal states)
+            unique_visited = set((state[0].row, state[0].col) for state in visited)
+            visited_coordinates = sorted(list(unique_visited))
+            
+            print(f"Number of nodes visited: {len(unique_visited)}")
+            print(f"Visited nodes: {visited_coordinates}")
+            
             path_cells = reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles)
-            cost = len(path_cells) - 1 # initial state is not considered 
-            print("Cost :\nS")
-            print(cost)
+            cost = len(path_cells) - 1
+            print(f"Cost : {cost} ")
             
             # Maintain explored cells visualization
             for cell in explored_cells:
@@ -415,7 +422,7 @@ def aStarWithRemoval(draw, grid, start, end, max_removals): # A* search with and
     
     open_set_hash = {initial_state} # A set that mirrors open_set, stores the cells currently in the queue to allow for efficient membership checks
     open_set.put((f_score[initial_state], count, initial_state)) # putting the source (start) cell into the Pqueue
-    visited_nodes = set()
+    visited_nodes = set() #####
     max_frontier_size = 0
 
     while not open_set.empty():
@@ -429,7 +436,7 @@ def aStarWithRemoval(draw, grid, start, end, max_removals): # A* search with and
         if current_cell == end:
             end_time = time.time()
             calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size)
-            show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles)
+            show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles,visited_nodes)
             return True
 
         # Get neighbors including potential obstacle removals
@@ -478,7 +485,7 @@ def get_neighbors_with_removals(cell, grid, removals_used, max_removals):
                 
     return neighbors
 
-def show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles):
+def show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles,visited_nodes):
     path = []
     removed_list = []
     
@@ -496,6 +503,9 @@ def show_path_with_removals(ancestor, current_state, start, draw, removed_obstac
     print(f"Path found with {len(removed_list)} obstacle(s) removed")
     print(f"Removed obstacles at positions: {removed_list}")
     print(f"Shortest path: {path[::-1]}")
+    print(f"Cost: {len(path)-1}")
+    print(f"Number of visited nodes: {len(visited_nodes)}")
+    print(f"Visited nodes: {sorted(visited_nodes)}")
 
 def create_grid(rows, cols, cell_size, obstacle_coords):
     grid = []
