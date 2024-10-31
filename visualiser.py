@@ -1,6 +1,7 @@
 import pygame
-import math
 import time 
+import psutil
+import os
 from queue import PriorityQueue
 
 # credits - Tech With Tim
@@ -121,8 +122,24 @@ def show_path(came_from, cur, start, draw):  # backtracks through the cells to d
             cur.make_path()
         draw()
 
-
 def search(draw, grid, start, end):  # the search algorithm
+
+    # keeping track of the complexities ( Tracks execution time, Measures memory usage, Counts explored nodes, Tracks maximum frontier size, Prints theoretical complexity analysis, Shows actual performance metrics)
+    start_time = time.time()
+    count = 0
+    open_set = PriorityQueue()
+    ancestor = {}
+    g_score = {cell: float("inf") for row in grid for cell in row}
+    g_score[start] = 0
+    f_score = {cell: float("inf") for row in grid for cell in row}
+    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos()) + g_score[start]
+
+    open_set_hash = {start}
+    open_set.put((f_score[start], count, start))
+    visited_nodes = set()
+    max_frontier_size = 0
+
+    
     count = 0 # so that ties are broken by insertion order in the Pq
     open_set = PriorityQueue() # Frontier | lower-priority (better f scorre) cells being dequeued first
     ancestor = {} # to reconstruct the path once the end cell is reached
@@ -130,18 +147,46 @@ def search(draw, grid, start, end):  # the search algorithm
     g_score[start] = 0
     f_score = {cell: float("inf") for row in grid for cell in row} # Initially, all cells are set to infinity
     f_score[start] = heuristic_fn(start.get_pos(), end.get_pos()) + g_score[start]
+
     open_set_hash = {start} # A set that mirrors open_set, stores the cells currently in the queue to allow for efficient membership checks
     open_set.put((f_score[start], count, start))  # putting the source (start) cell into the Pqueue
+
+    # Track visited nodes
+    visited_nodes = set()
+
     while not open_set.empty():
+        max_frontier_size = max(max_frontier_size, len(open_set_hash))
         for event in pygame.event.get():
             if event.type == pygame.QUIT: # if user quits window
                 pygame.quit()
+
         cur = open_set.get()[2] # Retrieves the cell with the lowest f_score from open_set
         open_set_hash.remove(cur) # because we are now exploring it
-        if cur == end:  # if the destination is reached, display the path
+        visited_nodes.add((cur.row, cur.col))
+
+
+        if cur == end:
+            end_time = time.time() # stop timer 
+            calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size)
+            path = []
+            current = end
+            while current in ancestor:
+                path.append((current.row, current.col))
+                current = ancestor[current]
+            path.append((start.row, start.col))
+            path.reverse()
+            
+            print("\n=== Search Results ===")
+            print(f"Path found! Cost: {g_score[end]}")
+            print(f"Shortest path: {path}")
+            print(f"Number of nodes visited: {len(visited_nodes)}")
+            print(f"Visited nodes: {sorted(visited_nodes)}")
+            
             show_path(ancestor, end, start, draw)
             end.make_end()
-            return True # path was found
+            return True
+        
+        
         for neighbour in cur.neighbours:  # check the neighbours of the current cell 
             if g_score[cur] + 1 < g_score[neighbour]: # is the path to neighbour through cur shorter than the previously recorded path 
                 ancestor[neighbour] = cur
@@ -155,8 +200,14 @@ def search(draw, grid, start, end):  # the search algorithm
         draw()
         if cur != start: # If cur is not the start cell, its color is changed to indicate that it has been fully explored
             cur.make_closed()
-        
+    
+    print("No solution found!")
+    print(f"Number of nodes visited: {len(visited_nodes)}")
+    print(f"Visited nodes: {sorted(visited_nodes)}")
+    end_time = time.time()
+    calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size) # we get performance metrics for both successful and unsuccessful searches
     return False
+    
 
 
 def create_grid(rows, cols, cell_size, obstacle_coords):
@@ -192,15 +243,6 @@ def draw(win, grid, rows, cols, width):
     pygame.display.update()
     time.sleep(0.1)  # Adds a 0.1 second delay
 
-'''''
-def get_clicked_pos(pos, rows, width):
-    gap = width // rows
-    y, x = pos
-    row = y // gap
-    col = x // gap
-    return row, col
-    '''
-
 
 def read_input_file(filename):
     with open(filename, 'r') as file:
@@ -223,12 +265,44 @@ def read_input_file(filename):
         
         return rows, cols, obstacle_coords, obstacles_to_remove, search_type
     
+def calculate_performance_metrics(start_time, end_time, visited_nodes, open_set_size):
+    time_taken = end_time - start_time
+    
+    # Get memory usage
+    process = psutil.Process(os.getpid())
+    memory_used = process.memory_info().rss / 1024 / 1024  # Convert to MB
+    
+    print("\n=== Performance Metrics ===")
+    print(f"Time taken: {time_taken:.4f} seconds")
+    print(f"Memory used: {memory_used:.2f} MB")
+    print(f"Space complexity: O(|V|) where |V| = {len(visited_nodes)} nodes explored")
+    print(f"Maximum frontier size: {open_set_size} nodes")
+    print(f"Time complexity: O(|V| + |E|) where |E| = number of edges explored")
+
+    
 
 def main():
     CELL_SIZE = 40
     
-    # Read from file 
-    rows, cols, obstacle_coords, obstacles_to_remove, search_type = read_input_file('input.txt')
+    try:
+        rows, cols, obstacle_coords, obstacles_to_remove, search_type = read_input_file('input.txt')
+        
+        # Validate input
+        if rows <= 0 or cols <= 0:
+            raise ValueError("Invalid grid dimensions")
+        for row, col in obstacle_coords:
+            if row < 0 or row >= rows or col < 0 or col >= cols:
+                raise ValueError("Invalid obstacle coordinates")
+    
+    except FileNotFoundError:
+        print("Error: Input file not found")
+        return
+    except ValueError as e:
+        print(f"Error: Invalid input format - {str(e)}")
+        return
+    except Exception as e:
+        print(f"Error: Unexpected error occurred - {str(e)}")
+        return
     
     # Create window based on grid size
     win = create_window(rows, cols)
@@ -267,6 +341,7 @@ def main():
                     end.make_end()
     
     pygame.quit()
+
 
 
 pygame.display.set_caption("Heuristic Search (A*)")
