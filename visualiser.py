@@ -121,43 +121,6 @@ def show_path(came_from, cur, start, draw):  # for a* and bfs without removal Bb
         if cur != start:
             cur.make_path()
         draw()
-'''''
-def show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles): # for a* and bfs without removal
-    path = []
-    path_cells = set()  # Initialize empty set for path cells
-    removed_list = []
-    actual_removed = set()
-    
-    current = current_state
-    while current in ancestor:
-        cell, removals = current
-        path_cells.add(cell)  # Add each cell to the set
-        
-        if current in removed_obstacles:
-            removed_list.append(removed_obstacles[current])
-            actual_removed.add(cell)
-        
-        path.append((cell.row, cell.col))
-        
-        if cell != start:
-            if cell in actual_removed:
-                cell.make_barrier()
-            else:
-                cell.make_path()
-        
-        current = ancestor[current]
-        draw()
-    
-    path.append((start.row, start.col))
-    path_cells.add(start)  # Don't forget to add start cell
-    
-    print("\n=== Path Details ===")
-    print(f"Path found with {len(removed_list)} obstacle(s) removed")
-    print(f"Removed obstacles at positions: {removed_list}")
-    print(f"Complete path: {path[::-1]}")
-    
-    return path_cells  # Now we always return a set, even if empty
-'''
 
 def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles):
     path = []
