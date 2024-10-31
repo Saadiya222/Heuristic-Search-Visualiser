@@ -1,17 +1,20 @@
 import pygame
 import math
-import random
+import time 
 from queue import PriorityQueue
 
 # credits - Tech With Tim
 
 # display settings for the pygame window
 
-WIDTH = 800 # sets the window width to 800 pixels
-WIN = pygame.display.set_mode((WIDTH, WIDTH)) # creates a Pygame window where the grid and pathfinding visualization will be displayed
+def create_window(rows, cols):
+    CELL_SIZE = 40  # Fixed size for each cell
+    width = cols * CELL_SIZE
+    height = rows * CELL_SIZE
+    return pygame.display.set_mode((width, height))
+
 
 # mentioning the color for cells of each state
-
 OBSTACLE_COLOR = (0, 0, 0)
 EXPLORED_COLOR = (211, 211, 211)
 YELLOW = (255, 255, 0) ###
@@ -23,15 +26,16 @@ END_COLOR = (255,192,203) # princess color pink
 
 
 class Cell:
-    def __init__(self, row, col, width, total_rows): # Initializes each cell with attributes like its position, color, and list of neighboring cells
+    def __init__(self, row, col, cell_size):
         self.row = row
         self.col = col
-        self.x = col * width  # Changed from row to col for x coordinate
-        self.y = row * width
+        self.x = col * cell_size
+        self.y = row * cell_size
         self.color = CREAM
         self.neighbours = []
-        self.width = width
-        self.total_rows = total_rows
+        self.width = cell_size
+        self.total_rows = None
+        self.total_cols = None
 
     def get_pos(self): # Returns the cell’s row and column position
         return self.row, self.col
@@ -85,18 +89,24 @@ class Cell:
 
     def update_neighbours(self, grid): # Updates the neighbours list for each cell by checking for open cells around it
         self.neighbours = []
-        if self.row < self.total_rows - 1 and not grid[self.row + 1][self.col].is_barrier():  # DOWN
+        self.total_rows = len(grid)
+        self.total_cols = len(grid[0])
+
+        # DOWN
+        if self.row < self.total_rows - 1 and not grid[self.row + 1][self.col].is_barrier():
             self.neighbours.append(grid[self.row + 1][self.col])
-        if self.row > 0 and not grid[self.row - 1][self.col].is_barrier():  # UP
+
+        # UP
+        if self.row > 0 and not grid[self.row - 1][self.col].is_barrier():
             self.neighbours.append(grid[self.row - 1][self.col])
-        if self.col < self.total_rows - 1 and not grid[self.row][self.col + 1].is_barrier():  # RIGHT
+
+        # RIGHT
+        if self.col < self.total_cols - 1 and not grid[self.row][self.col + 1].is_barrier():
             self.neighbours.append(grid[self.row][self.col + 1])
-        if self.col > 0 and not grid[self.row][self.col - 1].is_barrier():  # LEFT
+
+        # LEFT
+        if self.col > 0 and not grid[self.row][self.col - 1].is_barrier():
             self.neighbours.append(grid[self.row][self.col - 1])
-
-    def __lt__(self, other):
-        return False
-
 
 def heuristic_fn(p1, p2):  # the heuristic function used in our scenario is manhattan distance (sum of the absolute differences between the x and y coordinates of two points)
     x1, y1 = p1
@@ -149,32 +159,27 @@ def search(draw, grid, start, end):  # the search algorithm
     return False
 
 
-def create_grid(rows, cols, width, obstacle_coords):
+def create_grid(rows, cols, cell_size, obstacle_coords):
     grid = []
-    gap = width // max(rows, cols)
-    
     for i in range(rows):
         grid.append([])
         for j in range(cols):
-            cell = Cell(i, j, gap, max(rows, cols))
+            cell = Cell(i, j, cell_size)
             if (i, j) in obstacle_coords:
                 cell.make_barrier()
             grid[i].append(cell)
-    
     return grid
 
 
 
-def draw_grid(win, rows,cols,  width):
-    gap = width // max(rows, cols)
-    
+
+def draw_grid(win, rows, cols, cell_size):
     # Draw horizontal lines
     for i in range(rows + 1):
-        pygame.draw.line(win, GREY, (0, i * gap), (width, i * gap))
-    
+        pygame.draw.line(win, GREY, (0, i * cell_size), (cols * cell_size, i * cell_size))
     # Draw vertical lines
     for j in range(cols + 1):
-        pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
+        pygame.draw.line(win, GREY, (j * cell_size, 0), (j * cell_size, rows * cell_size))
 
 
 
@@ -185,6 +190,7 @@ def draw(win, grid, rows, cols, width):
             cell.draw(win)
     draw_grid(win, rows, cols, width)
     pygame.display.update()
+    time.sleep(0.1)  # Adds a 0.1 second delay
 
 '''''
 def get_clicked_pos(pos, rows, width):
@@ -196,21 +202,38 @@ def get_clicked_pos(pos, rows, width):
     '''
 
 
-def main(win, width):
-    # Get grid dimensions from user
-    rows = int(input("Enter number of rows: "))
-    cols = int(input("Enter number of columns: "))
+def read_input_file(filename):
+    with open(filename, 'r') as file:
+        # Read grid dimensions
+        rows, cols = map(int, file.readline().strip().split())
+        
+        # Read obstacles
+        obstacle_coords = []
+        line = file.readline().strip()
+        while line and line[0].isdigit():
+            row, col = map(int, line.split())
+            obstacle_coords.append((row, col))
+            line = file.readline().strip()
+            
+        # Read number of obstacles to remove
+        obstacles_to_remove = int(line.split('=')[1].strip())
+        
+        # Read search type
+        search_type = file.readline().strip()
+        
+        return rows, cols, obstacle_coords, obstacles_to_remove, search_type
     
-    # Get obstacle coordinates
-    obstacle_coords = []
-    num_obstacles = int(input("Enter number of obstacles: "))
+
+def main():
+    CELL_SIZE = 40
     
-    print("Enter obstacle coordinates (row col) one per line:")
-    for _ in range(num_obstacles):
-        row, col = map(int, input().split())
-        obstacle_coords.append((row, col))
+    # Read from file 
+    rows, cols, obstacle_coords, obstacles_to_remove, search_type = read_input_file('input.txt')
     
-    grid = create_grid(rows, cols, width, obstacle_coords)
+    # Create window based on grid size
+    win = create_window(rows, cols)
+    
+    grid = create_grid(rows, cols, CELL_SIZE, obstacle_coords)
     
     # Set fixed start and end positions
     start = grid[0][0]  # Top-left corner
@@ -222,7 +245,7 @@ def main(win, width):
     run = True
     
     while run:
-        draw(win, grid, rows, cols, width)
+        draw(win, grid, rows, cols, CELL_SIZE)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -234,10 +257,10 @@ def main(win, width):
                         for cell in row:
                             cell.update_neighbours(grid)
                     
-                    search(lambda: draw(win, grid, rows, cols, width), grid, start, end)
+                    search(lambda: draw(win, grid, rows, cols, CELL_SIZE), grid, start, end)
                 
                 if event.key == pygame.K_c:
-                    grid = create_grid(rows, cols, width, obstacle_coords)
+                    grid = create_grid(rows, cols, CELL_SIZE, obstacle_coords)
                     start = grid[0][0]
                     end = grid[rows-1][cols-1]
                     start.make_start()
@@ -248,4 +271,7 @@ def main(win, width):
 
 pygame.display.set_caption("Heuristic Search (A*)")
 
-main(WIN, WIDTH)
+main()
+
+
+
