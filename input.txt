@@ -1,7 +1,12 @@
 10 10
-0 0
 1 1
 2 2
 3 3
-4 4
-obstacles to remove = 2
+0 4
+4 0
+0 4 
+5 3 
+8 2
+2 7
+2 9
+obstacles to remove = 3
