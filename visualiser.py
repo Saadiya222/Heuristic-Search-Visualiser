@@ -285,16 +285,23 @@ def bfsWithoutRemoval(draw, grid, start, end):
 
 def bfsWithRemoval(draw, grid, start, end, max_removals):
     global current_algorithm, current_removed_obstacles, current_path_cost
-    current_algorithm = "BFS with removal" 
+    current_algorithm = "BFS with removal"
     current_removed_obstacles = None
     current_path_cost = None
 
     obstacles_to_remove = find_removable_obstacles(grid, start, end, max_removals)
     
-    # Pre-process grid
+    # Pre-process grid and update neighbors
     for row, col in obstacles_to_remove:
         grid[row][col].make_open()
-    
+        # Update neighbors for the cell and its adjacent cells
+        grid[row][col].update_neighbours(grid)
+        # Update neighbors for adjacent cells
+        for dx, dy in [(0,1), (0,-1), (1,0), (-1,0)]:
+            new_row, new_col = row + dx, col + dy
+            if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
+                grid[new_row][new_col].update_neighbours(grid)
+                
     start_time = time.time()
     queue = deque([start])
     visited = {start}
