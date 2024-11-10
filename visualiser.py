@@ -326,6 +326,7 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
             current_removed_obstacles = obstacles_to_remove  # Show the actual coordinates
             print("\n=== Search Results (BFS with removal) ===")
             print(f" *** Path found! *** ")
+            print(f"Shortest path: {path}")
             print(f"Number of obstacles removed: {len(obstacles_to_remove)}")
             print(f"Obstacles removed at: {obstacles_to_remove}")
             
@@ -393,6 +394,7 @@ def aStarWithoutRemoval(draw, grid, start, end):
             current_path_cost = len(path) - 1
             print("\n=== Search Results (A*) ===")
             print(f" *** Path found! *** ")
+            print(f"Shortest path: {path}")
             print(f"Number of nodes visited: {len(visited_nodes)}")
             print(f"Visited nodes: {sorted(list(visited_nodes))}")
             
@@ -473,6 +475,7 @@ def aStarWithRemoval(draw, grid, start, end, max_removals):
             current_removed_obstacles = obstacles_to_remove
             print("\n=== Search Results (A* with removal) ===")
             print(f" *** Path found! *** ")
+            print(f"Shortest path: {path}")
             print(f"Number of obstacles removed: {len(obstacles_to_remove)}")
             print(f"Obstacles removed at: {obstacles_to_remove}")
             print(f"Number of nodes visited: {len(visited_nodes)}")
