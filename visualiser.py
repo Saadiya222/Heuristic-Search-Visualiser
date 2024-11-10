@@ -301,7 +301,7 @@ def bfsWithRemoval(draw, grid, start, end, max_removals):
             new_row, new_col = row + dx, col + dy
             if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
                 grid[new_row][new_col].update_neighbours(grid)
-                
+
     start_time = time.time()
     queue = deque([start])
     visited = {start}
@@ -436,13 +436,18 @@ def aStarWithRemoval(draw, grid, start, end, max_removals):
     current_removed_obstacles = None
     current_path_cost = None
 
-    # Find removable obstacles first
     obstacles_to_remove = find_removable_obstacles(grid, start, end, max_removals)
     
-    
-    # Pre-process grid
+    # Pre-process grid and update neighbors
     for row, col in obstacles_to_remove:
         grid[row][col].make_open()
+        # Update neighbors for the cell and its adjacent cells
+        grid[row][col].update_neighbours(grid)
+        # Update neighbors for adjacent cells
+        for dx, dy in [(0,1), (0,-1), (1,0), (-1,0)]:
+            new_row, new_col = row + dx, col + dy
+            if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
+                grid[new_row][new_col].update_neighbours(grid)
     
     # Regular A* visualization
     start_time = time.time()
@@ -620,18 +625,24 @@ def read_input_file(filename):
         
         return rows, cols, obstacle_coords, obstacles_to_remove, search_type
     
+
 def calculate_performance_metrics(start_time, end_time, visited_nodes, open_set_size, search_type="A*"):
-    # he parameter 'search_type="A*"' is a default value that ensures backward compatibility with existing code. When no search type is specified in the function call, it assumes we're running A*. This default value makes the function flexible - it can handle both old calls (which don't specify a search type) and new calls (which do specify BFS or other search types). It's a good programming practice that allows us to extend functionality while maintaining existing code.
     time_taken = end_time - start_time
     process = psutil.Process(os.getpid())
     memory_used = process.memory_info().rss / 1024 / 1024
+    
+    # Determine time complexity based on algorithm type
+    if "A*" in search_type:
+        time_complexity = "O(|V| log |V|)"
+    else:  # BFS
+        time_complexity = "O(|V| + |E|)"
     
     print(f"\n=== Performance Metrics ({search_type}) ===")
     print(f"Time taken: {time_taken:.4f} seconds")
     print(f"Memory used: {memory_used:.2f} MB")
     print(f"Space complexity: O(|V|) where |V| = {len(visited_nodes)} nodes explored")
     print(f"Maximum frontier size: {open_set_size} nodes")
-    print(f"Time complexity: O(|V| + |E|) where |E| = number of edges explored")
+    print(f"Time complexity: {time_complexity} where |V| = number of vertices, |E| = number of edges")
     
 
 def main():
