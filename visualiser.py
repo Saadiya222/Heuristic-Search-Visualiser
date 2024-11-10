@@ -10,12 +10,21 @@ from collections import deque # For BFS
 # display settings for the pygame window
 def create_window(rows, cols):
     CELL_SIZE = 40  # Fixed size for each cell
-    width = cols * CELL_SIZE
+    width = (cols * CELL_SIZE) 
     height = rows * CELL_SIZE
-    return pygame.display.set_mode((width, height))
+    INFO_HEIGHT = 100
+    WINDOW_HEIGHT = height + INFO_HEIGHT
+    WINDOW = pygame.display.set_mode((width, WINDOW_HEIGHT))
+    return WINDOW 
 
 
 # mentioning the color for cells of each state
+current_algorithm = ""
+current_removed_obstacles = None
+current_path_cost = None
+INFO_HEIGHT = 100
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 OBSTACLE_COLOR = (0, 0, 0)
 EXPLORED_COLOR = (211, 211, 211)
 YELLOW = (255, 255, 0) ###
@@ -122,11 +131,41 @@ def show_path(came_from, cur, start, draw):  # for a* and bfs without removal Bb
             cur.make_path()
         draw()
 
+def draw_info_panel(win, rows, cols, cell_size, y_offset=0):
+    # Calculate font size based on window width
+    font_size = min(20, int(cols * cell_size / 30))
+    font = pygame.font.SysFont('arial', font_size)
+    
+    # Calculate dynamic spacing
+    line_height = font_size + 5
+    x_margin = int(cols * cell_size * 0.02)  # 2% of window width
+    
+    # Background
+    pygame.draw.rect(win, WHITE, (0, 0, cols * cell_size, y_offset))
+    pygame.draw.line(win, GREY, (0, y_offset), (cols * cell_size, y_offset), 2)
+    
+    # Dynamic text positioning
+    if current_algorithm:
+        title = font.render(f"Algorithm: {current_algorithm}", True, BLACK)
+        win.blit(title, (x_margin, line_height))
+    
+    if current_removed_obstacles:
+        obstacle_text = font.render(f"Removed obstacles at: {current_removed_obstacles}", True, BLACK)
+        win.blit(obstacle_text, (x_margin, 2 * line_height))
+    
+    if current_path_cost is not None:
+        path_found = font.render("*** PATH FOUND! ***", True, (0, 128, 0))
+        win.blit(path_found, (x_margin, 3 * line_height))
+        cost_text = font.render(f"Path cost: {current_path_cost}", True, BLACK)
+        win.blit(cost_text, (x_margin, 4 * line_height))
+
+
+
+
 def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles):
     path = []
     path_cells = set()
     removed_list = []
-    actual_removed = set()
     
     current = current_state
     while current in ancestor:
@@ -135,28 +174,22 @@ def reconstruct_removal_path(ancestor, current_state, start, draw, removed_obsta
         
         if current in removed_obstacles:
             removed_list.append(removed_obstacles[current])
-            actual_removed.add(cell)
         
         path.append((cell.row, cell.col))
-        
         if cell != start:
-            if cell in actual_removed:
-                cell.make_barrier()
-            else:
-                cell.make_path()
+            cell.make_path()
         
         current = ancestor[current]
         draw()
     
-    # Add start position
     path.append((start.row, start.col))
     path_cells.add(start)
     
-
     print(f"Path found with {len(removed_list)} obstacle(s) removed")
     print(f"Removed obstacles at positions: {removed_list}")
     print(f"Shortest path: {path[::-1]}")
     print()
+    
     return path_cells
 
 def get_path_coordinates(ancestor, end, start):
@@ -168,7 +201,40 @@ def get_path_coordinates(ancestor, end, start):
     path.append((start.row, start.col))
     return path[::-1]  # Reverse to get start->end order
 
+def find_removable_obstacles(grid, start, end, max_removals):
+    queue = deque([(start, 0, [])])  # (cell, removals_used, removed_obstacles)
+    visited = {(start, 0)}
+    
+    while queue:
+        current, removals_used, removed = queue.popleft()
+        
+        if current == end:
+            return removed
+            
+        for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            new_row = current.row + dx
+            new_col = current.col + dy
+            
+            if 0 <= new_row < len(grid) and 0 <= new_col < len(grid[0]):
+                neighbor = grid[new_row][new_col]
+                if neighbor.is_barrier() and removals_used < max_removals:
+                    new_state = (neighbor, removals_used + 1)
+                    if new_state not in visited:
+                        visited.add(new_state)
+                        queue.append((neighbor, removals_used + 1, removed + [(new_row, new_col)]))
+                elif not neighbor.is_barrier():
+                    new_state = (neighbor, removals_used)
+                    if new_state not in visited:
+                        visited.add(new_state)
+                        queue.append((neighbor, removals_used, removed))
+    return []
+
+
 def bfsWithoutRemoval(draw, grid, start, end):
+    global current_algorithm, current_removed_obstacles, current_path_cost
+    current_algorithm = "BFS"  
+    current_removed_obstacles = None
+    current_path_cost = None
     start_time = time.time()
     queue = deque([start])
     visited = {start}
@@ -178,10 +244,17 @@ def bfsWithoutRemoval(draw, grid, start, end):
     while queue:
         max_queue_size = max(max_queue_size, len(queue))
         current = queue.popleft()
-        
+
+        if current != start and current != end:
+            current.make_start()  # Shows knight's current position in gold
+            draw()
+            time.sleep(0.2)  # Optional: adds a slight pause to make movement more visible
+            current.make_closed()  # Then marks it as explored
+
         if current == end:
             end_time = time.time()
             path = get_path_coordinates(ancestor, end, start)
+            current_path_cost = len(path) - 1
             print("\n=== Search Results (BFS) ===")
             print(f" *** Path found! *** \nCost: ({len(path) -1})")
             print(f"Shortest path: {path}")   
@@ -211,225 +284,222 @@ def bfsWithoutRemoval(draw, grid, start, end):
     return False
 
 def bfsWithRemoval(draw, grid, start, end, max_removals):
+    global current_algorithm, current_removed_obstacles, current_path_cost
+    current_algorithm = "BFS with removal" 
+    current_removed_obstacles = None
+    current_path_cost = None
+
+    obstacles_to_remove = find_removable_obstacles(grid, start, end, max_removals)
+    
+    # Pre-process grid
+    for row, col in obstacles_to_remove:
+        grid[row][col].make_open()
+    
     start_time = time.time()
-    initial_state = (start, 0)
-    queue = deque([initial_state])
-    visited = {initial_state}
+    queue = deque([start])
+    visited = {start}
     ancestor = {}
-    removed_obstacles = {}
     max_queue_size = 1
     explored_cells = set()
+    path_cells = set()  # Initialize path_cells set
     
     while queue:
         max_queue_size = max(max_queue_size, len(queue))
-        current_state = queue.popleft()
-        current_cell, removals_used = current_state
-        
-        explored_cells.add(current_cell)
-        if current_cell != start and current_cell != end:
-            current_cell.make_closed()
-        
-        if current_cell == end:
+        current = queue.popleft()
+        path_cells.add(current)  # Add current cell to path_cells
+
+        if current != start and current != end:
+            current.make_start()
+            draw()
+            time.sleep(0.2)
+            current.make_closed()
+
+        explored_cells.add(current)
+        if current != start and current != end:
+            current.make_closed()
+            
+        if current == end:
             end_time = time.time()
+            path = get_path_coordinates(ancestor, end, start)
+            current_path_cost = len(path) - 1            
+            current_removed_obstacles = len(obstacles_to_remove)
+            current_removed_obstacles = obstacles_to_remove  # Show the actual coordinates
             print("\n=== Search Results (BFS with removal) ===")
             print(f" *** Path found! *** ")
+            print(f"Number of obstacles removed: {len(obstacles_to_remove)}")
+            print(f"Obstacles removed at: {obstacles_to_remove}")
             
-            # Get unique visited cells (without duplicates from different removal states)
-            unique_visited = set((state[0].row, state[0].col) for state in visited)
-            visited_coordinates = sorted(list(unique_visited))
-            
+            unique_visited = set((node.row, node.col) for node in visited)
             print(f"Number of nodes visited: {len(unique_visited)}")
-            print(f"Visited nodes: {visited_coordinates}")
+            print(f"Visited nodes: {sorted(list(unique_visited))}")
             
-            path_cells = reconstruct_removal_path(ancestor, current_state, start, draw, removed_obstacles)
-            cost = len(path_cells) - 1
-            print(f"Cost : {cost} ")
-            
-            # Maintain explored cells visualization
-            for cell in explored_cells:
-                if cell not in path_cells and cell != start and cell != end:
-                    cell.make_closed()
-            
+            show_path(ancestor, end, start, draw)
             end.make_end()
             calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS with removal")
             return True
             
-        for neighbor in get_neighbors_with_removals(current_cell, grid, removals_used, max_removals):
-            neighbor_cell, new_removals, removed = neighbor
-            neighbor_state = (neighbor_cell, new_removals)
-            
-            if neighbor_state not in visited:
-                queue.append(neighbor_state)
-                visited.add(neighbor_state)
-                ancestor[neighbor_state] = current_state
-                if removed:
-                    removed_obstacles[neighbor_state] = (neighbor_cell.row, neighbor_cell.col)
-                if neighbor_cell not in explored_cells and neighbor_cell != end:
-                    neighbor_cell.make_open()
-        
+        for neighbor in current.neighbours:
+            if neighbor not in visited:
+                queue.append(neighbor)
+                visited.add(neighbor)
+                ancestor[neighbor] = current
+                if neighbor not in explored_cells and neighbor != end:
+                    neighbor.make_open()
         draw()
-    
-    end_time = time.time()
-    print("\n=== Search Results (BFS with removal) ===")
-    print("No path found!")
-    calculate_performance_metrics(start_time, end_time, visited, max_queue_size, search_type="BFS with removal")
-    return False 
+
+    return False
 
 
 
 
-def aStarWithoutRemoval(draw, grid, start, end):  # the search algorithm
 
-    # keeping track of the complexities ( Tracks execution time, Measures memory usage, Counts explored nodes, Tracks maximum frontier size, Prints theoretical complexity analysis, Shows actual performance metrics)
+
+def aStarWithoutRemoval(draw, grid, start, end):
+    global current_algorithm, current_removed_obstacles, current_path_cost
+    current_algorithm = "A*" 
+    current_removed_obstacles = None
+    current_path_cost = None
     start_time = time.time()
     count = 0
     open_set = PriorityQueue()
+    open_set.put((0, count, start))
     ancestor = {}
     g_score = {cell: float("inf") for row in grid for cell in row}
     g_score[start] = 0
     f_score = {cell: float("inf") for row in grid for cell in row}
-    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos()) + g_score[start]
-
+    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos())
+    
     open_set_hash = {start}
-    open_set.put((f_score[start], count, start))
     visited_nodes = set()
     max_frontier_size = 0
-
     
-    count = 0 # so that ties are broken by insertion order in the Pq
-    open_set = PriorityQueue() # Frontier | lower-priority (better f scorre) cells being dequeued first
-    ancestor = {} # to reconstruct the path once the end cell is reached
-    g_score = {cell: float("inf") for row in grid for cell in row} # Initially, all cells are set to infinity except for the g(start)=0, bc wel'll check in line 135
-    g_score[start] = 0
-    f_score = {cell: float("inf") for row in grid for cell in row} # Initially, all cells are set to infinity
-    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos()) + g_score[start]
-
-    open_set_hash = {start} # A set that mirrors open_set, stores the cells currently in the queue to allow for efficient membership checks
-    open_set.put((f_score[start], count, start)) # putting the source (start) cell into the Pqueue
-
-    # Track visited nodes
-    visited_nodes = set()
-
     while not open_set.empty():
         max_frontier_size = max(max_frontier_size, len(open_set_hash))
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT: # if user quits window
-                pygame.quit()
-
-        cur = open_set.get()[2] # Retrieves the cell with the lowest f_score from open_set
-        open_set_hash.remove(cur) # because we are now exploring it
-        visited_nodes.add((cur.row, cur.col))
-
-
-        if cur == end:
-            end_time = time.time() # stop timer 
-            calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size)
-            path = []
-            current = end
-            while current in ancestor:
-                path.append((current.row, current.col))
-                current = ancestor[current]
-            path.append((start.row, start.col))
-            path.reverse()
-            
-            print("\n=== Search Results ===")
-            print(f" *** Path found! ***  \nCost: {g_score[end]}")
-            print(f"Shortest path: {path}")
+        current = open_set.get()[2]
+        open_set_hash.remove(current)
+        visited_nodes.add((current.row, current.col))
+        
+        # Show knight's movement
+        if current != end:
+            current.make_start()
+            draw()
+            time.sleep(0.2)
+            if current != start:
+                current.make_closed()
+        
+        if current == end:
+            end_time = time.time()
+            path = get_path_coordinates(ancestor, end, start)
+            current_path_cost = len(path) - 1
+            print("\n=== Search Results (A*) ===")
+            print(f" *** Path found! *** ")
             print(f"Number of nodes visited: {len(visited_nodes)}")
-            print(f"Visited nodes: {sorted(visited_nodes)}")
+            print(f"Visited nodes: {sorted(list(visited_nodes))}")
             
             show_path(ancestor, end, start, draw)
             end.make_end()
+            calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size, search_type="A*")
             return True
-        
-        
-        for neighbour in cur.neighbours:  # check the neighbours of the current cell 
-            if g_score[cur] + 1 < g_score[neighbour]: # is the path to neighbour through cur shorter than the previously recorded path 
-                ancestor[neighbour] = cur
-                g_score[neighbour] = g_score[cur] + 1
-                f_score[neighbour] = g_score[neighbour] + heuristic_fn(neighbour.get_pos(), end.get_pos())
-                if neighbour not in open_set_hash:
+            
+        for neighbor in current.neighbours:
+            temp_g_score = g_score[current] + 1
+            
+            if temp_g_score < g_score[neighbor]:
+                ancestor[neighbor] = current
+                g_score[neighbor] = temp_g_score
+                f_score[neighbor] = temp_g_score + heuristic_fn(neighbor.get_pos(), end.get_pos())
+                if neighbor not in open_set_hash:
                     count += 1
-                    open_set.put((f_score[neighbour], count, neighbour))
-                    open_set_hash.add(neighbour)
-                    neighbour.make_open() # Changes the color of neighbour to indicate it has been added to the open set (light grey)
+                    open_set.put((f_score[neighbor], count, neighbor))
+                    open_set_hash.add(neighbor)
+                    neighbor.make_open()
+        
         draw()
-        if cur != start: # If cur is not the start cell, its color is changed to indicate that it has been fully explored
-            cur.make_closed()
     
-    print("No solution found!")
-    end_time = time.time()
-    calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size) # we get performance metrics for both successful and unsuccessful searches
     return False
+
     
 
 
-def aStarWithRemoval(draw, grid, start, end, max_removals): # A* search with and without obstacle removal
+def aStarWithRemoval(draw, grid, start, end, max_removals):
+    global current_algorithm, current_removed_obstacles, current_path_cost
+    current_algorithm = "A* with removal"
+    current_removed_obstacles = None
+    current_path_cost = None
+
+    # Find removable obstacles first
+    obstacles_to_remove = find_removable_obstacles(grid, start, end, max_removals)
     
-    # keeping track of the complexities ( Tracks execution time, Measures memory usage, Counts explored nodes, Tracks maximum frontier size, Prints theoretical complexity analysis, Shows actual performance metrics)
+    
+    # Pre-process grid
+    for row, col in obstacles_to_remove:
+        grid[row][col].make_open()
+    
+    # Regular A* visualization
     start_time = time.time()
-
-    count = 0 # so that ties are broken by insertion order in the Pq
+    path_cells = set()  # Add it here
+    count = 0
     open_set = PriorityQueue()
-    ancestor = {} # to reconstruct the path once the end cell is reached
-    removed_obstacles = {}  # Track which obstacles were removed in the optimal path
+    open_set.put((0, count, start))
+    ancestor = {}
+    g_score = {cell: float("inf") for row in grid for cell in row}
+    g_score[start] = 0
+    f_score = {cell: float("inf") for row in grid for cell in row}
+    f_score[start] = heuristic_fn(start.get_pos(), end.get_pos())
     
-    # State includes position and removals used
-    g_score = {}
-    f_score = {}
-    
-    # Initialize scores for start state
-    initial_state = (start, 0)  # (position, removals_used)
-    g_score[initial_state] = 0
-    f_score[initial_state] = heuristic_fn(start.get_pos(), end.get_pos())
-    
-    open_set_hash = {initial_state} # A set that mirrors open_set, stores the cells currently in the queue to allow for efficient membership checks
-    open_set.put((f_score[initial_state], count, initial_state)) # putting the source (start) cell into the Pqueue
-    visited_nodes = set() #####
+    open_set_hash = {start}
+    visited_nodes = set()
     max_frontier_size = 0
-
+    
     while not open_set.empty():
         max_frontier_size = max(max_frontier_size, len(open_set_hash))
+        current = open_set.get()[2]
+        path_cells.add(current)  # Add this line
+        open_set_hash.remove(current)
+        visited_nodes.add((current.row, current.col))
         
-        current_state = open_set.get()[2]
-        current_cell, removals_used = current_state
-        open_set_hash.remove(current_state)
-        visited_nodes.add((current_cell.row, current_cell.col))
-
-        if current_cell == end:
+        # Show knight's movement
+        if current != end:
+            current.make_start()
+            draw()
+            time.sleep(0.2)
+            if current != start:
+                current.make_closed()
+        
+        if current == end:
             end_time = time.time()
-            calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size)
-            show_path_with_removals(ancestor, current_state, start, draw, removed_obstacles,visited_nodes)
-            return True
-
-        # Get neighbors including potential obstacle removals
-        for neighbor in get_neighbors_with_removals(current_cell, grid, removals_used, max_removals):
-            neighbor_cell, new_removals, removed = neighbor
-            neighbor_state = (neighbor_cell, new_removals)
+            path = get_path_coordinates(ancestor, end, start)
+            current_path_cost = len(path) - 1
+            current_removed_obstacles = obstacles_to_remove
+            print("\n=== Search Results (A* with removal) ===")
+            print(f" *** Path found! *** ")
+            print(f"Number of obstacles removed: {len(obstacles_to_remove)}")
+            print(f"Obstacles removed at: {obstacles_to_remove}")
+            print(f"Number of nodes visited: {len(visited_nodes)}")
+            print(f"Visited nodes: {sorted(list(visited_nodes))}")
             
-            temp_g_score = g_score[current_state] + 1
-
-            if neighbor_state not in g_score or temp_g_score < g_score[neighbor_state]:
-                ancestor[neighbor_state] = current_state
-                if removed:
-                    removed_obstacles[neighbor_state] = (neighbor_cell.row, neighbor_cell.col)
-                g_score[neighbor_state] = temp_g_score
-                f_score[neighbor_state] = temp_g_score + heuristic_fn(neighbor_cell.get_pos(), end.get_pos())
-                
-                if neighbor_state not in open_set_hash:
+            show_path(ancestor, end, start, draw)
+            end.make_end()
+            calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size, search_type="A* with removal")
+            return True
+            
+        for neighbor in current.neighbours:
+            temp_g_score = g_score[current] + 1
+            
+            if temp_g_score < g_score[neighbor]:
+                ancestor[neighbor] = current
+                g_score[neighbor] = temp_g_score
+                f_score[neighbor] = temp_g_score + heuristic_fn(neighbor.get_pos(), end.get_pos())
+                if neighbor not in open_set_hash:
                     count += 1
-                    open_set.put((f_score[neighbor_state], count, neighbor_state))
-                    open_set_hash.add(neighbor_state)
-                    neighbor_cell.make_open() 
-
+                    open_set.put((f_score[neighbor], count, neighbor))
+                    open_set_hash.add(neighbor)
+                    neighbor.make_open()
+        
         draw()
-        if current_cell != start: # If cur is not the start cell, its color is changed to indicate that it has been fully explored
-            current_cell.make_closed()
-
-# we get performance metrics for both successful and unsuccessful searches
-    end_time = time.time()
-    calculate_performance_metrics(start_time, end_time, visited_nodes, max_frontier_size)
+    
     return False
+
 
 def get_neighbors_with_removals(cell, grid, removals_used, max_removals):
     neighbors = []
@@ -496,12 +566,27 @@ def draw_grid(win, rows, cols, cell_size):
 
 def draw(win, grid, rows, cols, width):
     win.fill(CREAM)
+    
+    # Draw info panel
+    draw_info_panel(win, rows, cols, width, INFO_HEIGHT)
+    
+    # Draw grid with offset
     for row in grid:
         for cell in row:
+            # Modify cell's y position to account for info panel
+            original_y = cell.y
+            cell.y += INFO_HEIGHT
             cell.draw(win)
-    draw_grid(win, rows, cols, width)
+            cell.y = original_y
+            
+    # Draw grid lines with offset
+    for i in range(rows + 1):
+        pygame.draw.line(win, GREY, (0, i * width + INFO_HEIGHT), (cols * width, i * width + INFO_HEIGHT))
+    for j in range(cols + 1):
+        pygame.draw.line(win, GREY, (j * width, INFO_HEIGHT), (j * width, rows * width + INFO_HEIGHT))
+    
     pygame.display.update()
-    time.sleep(0.1)  # Adds a 0.1 second delay
+    time.sleep(0.1)
 
 
 def read_input_file(filename):
@@ -541,6 +626,8 @@ def calculate_performance_metrics(start_time, end_time, visited_nodes, open_set_
 
 def main():
     CELL_SIZE = 40
+    pygame.init()
+    pygame.font.init()
     
     try:
         rows, cols, obstacle_coords, obstacles_to_remove, search_type = read_input_file('input.txt')
